@@ -7,7 +7,7 @@ def hello():
     <html>
     <body style="text-align:center; margin-top:100px; font-family:Arial">
         <h1>🚀 Hello GitLab CI!</h1>
-        <p>版本：v1.0</p>
+        <p>版本：v2.0</p>
         <p>构建号：{build}</p>
     </body>
     </html>
