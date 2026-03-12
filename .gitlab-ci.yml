@@ -58,6 +58,9 @@ verify:
   stage: verify
   tags:
     - docker
+  image: alpine:latest
+  before_script: 
+    - apk add --no-cache curl
   script:
     - echo "🔍 验证部署..."
     - sleep 5
