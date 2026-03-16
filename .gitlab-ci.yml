@@ -41,9 +41,7 @@ test:
     - if: $CI_COMMIT_BRANCH == "dev"
       when: on_success
   before_script: 
-    pip install -r requirements.txt \
-    -i https://pypi.tuna.tsinghua.edu.cn/simple \
-    --no-cache-dir
+    - pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple --no-cache-dir
   script: 
     - python -m pytest tests/ -v
   
