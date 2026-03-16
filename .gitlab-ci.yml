@@ -2,12 +2,15 @@ stages:
   - build
   - test
   - deploy
+  - deploy-prod
   - verify
   - notify
 
 variables:
   APP_NAME: "hello-gitlab-ci"
   APP_PORT: "5001"
+  APP_NAME_PROD: "hello-gitlab-ci-prod"
+  APP_PORT_PROD: "5002"
   DEPLOY_HOST: "192.168.65.100"
   HARBOR_HOST: "192.168.65.102:8080"
   HARBOR_PROJECT: "cicd-demo"
@@ -71,12 +74,42 @@ deploy:
           $IMAGE_NAME
         docker logout $HARBOR_HOST
       REMOTE
-    - echo "✅ 部署完成！"
+    - echo "✅ 生产环境部署完成！"
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
       when: on_success
 
-verify:
+deploy-prod:
+  stage: deploy-prod
+  tags:
+    - docker
+  before_script:
+    - mkdir -p ~/.ssh
+    - echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    - ssh-keyscan -H $DEPLOY_HOST >> ~/.ssh/known_hosts
+  script:
+    - echo "🚀 部署到生产环境 $DEPLOY_HOST ..."
+    - |
+      ssh devops@$DEPLOY_HOST << REMOTE
+        docker login $HARBOR_HOST -u $HARBOR_USER -p $HARBOR_PASS
+        docker pull $IMAGE_NAME
+        docker stop $APP_NAME_PROD 2>/dev/null || true
+        docker rm $APP_NAME_PROD 2>/dev/null || true
+        docker run -d \
+          --name $APP_NAME_PROD \
+          --restart always \
+          -p $APP_PORT_PROD:5000 \
+          $IMAGE_NAME
+        docker logout $HARBOR_HOST
+      REMOTE
+    - echo "✅ 部署完成！"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      when: manual
+      allow_failure: true
+
+verify_test_deploy:
   stage: verify
   tags:
     - docker
@@ -84,10 +117,10 @@ verify:
   before_script:
     - apk add --no-cache curl
   script:
-    - echo "🔍 验证部署..."
+    - echo "🔍 验证测试部署..."
     - sleep 5
     - curl -f http://$DEPLOY_HOST:$APP_PORT/health
-    - echo "✅ 健康检查通过！"
+    - echo "✅ 测试部署健康检查通过！"
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
       when: on_success
@@ -95,6 +128,10 @@ verify:
 .notify_template: &notify_template
   stage: notify
   image: alpine:latest
+  variables:
+    http_proxy: "http://192.168.65.1:7897"
+    https_proxy: "http://192.168.65.1:7897"
+    no_proxy: "192.168.65.100,192.168.65.101,192.168.65.102"
   before_script:
     - apk add --no-cache curl
 
@@ -105,7 +142,7 @@ notify-success:
       curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_TOKEN/sendMessage" \
         -d "chat_id=$TELEGRAM_CHAT_ID" \
         -d "parse_mode=Markdown" \
-        -d "text=✅ *流水线成功*%0A*项目*：$CI_PROJECT_NAME%0A*分支*：$CI_COMMIT_BRANCH%0A*提交*：$CI_COMMIT_MESSAGE%0A*耗时*：${CI_PIPELINE_DURATION}秒"
+        -d "text=✅ *流水线成功*%0A*项目*：$CI_PROJECT_NAME%0A*分支*：$CI_COMMIT_BRANCH%0A*提交*：$CI_COMMIT_MESSAGE%0A*详情*：$CI_PIPELINE_URL"
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
       when: on_success
