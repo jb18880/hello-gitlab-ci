@@ -95,6 +95,10 @@ verify:
 .notify_template: &notify_template
   stage: notify
   image: alpine:latest
+  variables:
+    http_proxy: "http://192.168.65.1:7897"
+    https_proxy: "http://192.168.65.1:7897"
+    no_proxy: "192.168.65.100,192.168.65.101,192.168.65.102"
   before_script:
     - apk add --no-cache curl
 
