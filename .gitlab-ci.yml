@@ -3,6 +3,7 @@ stages:
   - test
   - deploy
   - verify
+  - notify
 
 variables:
   APP_NAME: "hello-gitlab-ci"
@@ -90,3 +91,33 @@ verify:
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
       when: on_success
+
+.notify_template: &notify_template
+  stage: notify
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache curl
+
+notify-success:
+  <<: *notify_template
+  script:
+    - |
+      curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_TOKEN/sendMessage" \
+        -d "chat_id=$TELEGRAM_CHAT_ID" \
+        -d "parse_mode=Markdown" \
+        -d "text=✅ *流水线成功*%0A*项目*：$CI_PROJECT_NAME%0A*分支*：$CI_COMMIT_BRANCH%0A*提交*：$CI_COMMIT_MESSAGE%0A*耗时*：${CI_PIPELINE_DURATION}秒"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      when: on_success
+
+notify-failure:
+  <<: *notify_template
+  script:
+    - |
+      curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_TOKEN/sendMessage" \
+        -d "chat_id=$TELEGRAM_CHAT_ID" \
+        -d "parse_mode=Markdown" \
+        -d "text=❌ *流水线失败*%0A*项目*：$CI_PROJECT_NAME%0A*分支*：$CI_COMMIT_BRANCH%0A*提交*：$CI_COMMIT_MESSAGE%0A*详情*：$CI_PIPELINE_URL"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      when: on_failure
